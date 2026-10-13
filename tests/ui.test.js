@@ -7,6 +7,13 @@ import path from 'node:path';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import vm from 'node:vm';
+import { createRequire } from 'node:module';
+import { parse as parseJSX } from '@babel/parser';
+const require = createRequire(import.meta.url);
+const platformBinaryInstalled = (() => {
+  try { require.resolve(`@esbuild/${process.platform}-${process.arch}/bin/esbuild`); return true; }
+  catch { return false; }
+})();
 
 const project=fileURLToPath(new URL('..',import.meta.url));
 const memory=new Map([['sgm_settings',JSON.stringify({openTime:'00:00',closeTime:'23:59'})]]);
@@ -16,7 +23,7 @@ globalThis.window={location:{hostname:'localhost',origin:'http://localhost',href
 Object.defineProperty(globalThis,'navigator',{value:{userAgent:'test',onLine:true},configurable:true});
 const fixtureUser={id:'test',name:'Deneme Öğrenci',identityNo:'12345678',pin:'87654321',specialCode:'23456789',activeDeskId:null,strikes:0,breaks:{short:2,long:1},violationHistory:[],lostDeskIds:[]};
 
-test('all retained panels render without runtime reference errors',async()=>{
+test('all retained panels render without runtime reference errors', { skip: !platformBinaryInstalled && 'Uploaded Windows node_modules has no Linux esbuild binary; npm ci required' }, async()=>{
  const source=await readFile(path.join(project,'kutuphaneprogramıguncell.jsx'),'utf8');
  const temp=await mkdtemp(path.join(project,'.ui-test-'));
  try{
@@ -31,6 +38,11 @@ test('all retained panels render without runtime reference errors',async()=>{
    assert.ok(!html.includes('Tutanak'),`${view}/${tab} has no Tutanak controls`);
   }
  }finally{await rm(temp,{recursive:true,force:true});}
+});
+
+test('Ana React dosyasının JSX sözdizimi doğrulanır', async () => {
+  const source = await readFile(path.join(project,'kutuphaneprogramıguncell.jsx'),'utf8');
+  assert.doesNotThrow(() => parseJSX(source,{sourceType:'module',plugins:['jsx']}));
 });
 
 test('background notification payload is displayed once; data-only payload uses worker',async()=>{
